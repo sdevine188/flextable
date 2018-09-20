@@ -2,6 +2,9 @@ library(tidyverse)
 library(officer)
 library(flextable)
 library(rvg)
+library(rmarkdown)
+library(webshot)
+library(magick)
 
 # https://davidgohel.github.io/flextable/articles/overview.html
 
@@ -377,6 +380,10 @@ myft
 # display can accept image insertion
 img.file <- file.path( R.home("doc"), "html", "logo.jpg" )
 
+myft <- flextable( head(mtcars), 
+                   col_keys = c("am", "separator", "gear", "mpg", "drat", "qsec" ))
+myft
+
 myft <- display( myft, i = ~ qsec > 18, col_key = "qsec", 
                  pattern = "blah blah {{r_logo}} {{qsec}}",
                  formatters = list(
@@ -400,26 +407,105 @@ myft
 ft <- mtcars %>% head() %>% regulartable() %>% theme_booktabs() %>% autofit()
 ft
 
-# create powerpoint with table
+# create powerpoint with regulartable
+# note the table can be easily copied from ppt to excel
 ppt <- read_pptx() %>% add_slide(layout = "Title and Content", master = "Office Theme") %>%
         ph_with_flextable(value = ft, type = "body") 
 pptx_summary(ppt) %>% head()
 
 # save powerpoint
+print(ppt, target = "regulartable_example.pptx")
+
+
+
+############
+
+
+# create powerpoint with flextable
+# note the table can be easily copied from ppt to excel
+myft 
+
+ppt <- read_pptx() %>% add_slide(layout = "Title and Content", master = "Office Theme") %>%
+        ph_with_flextable(value = myft, type = "body") 
+pptx_summary(ppt) %>% head()
+
+# save powerpoint - note that the r logo image is not saved to ppt for some reason??
 print(ppt, target = "flextable_example.pptx")
+
+class(myft)
 
 
 ##############
 
 
-# add flextable to powerpoint
+# add regulartable to word
+# note the table can be easily copied from word to excel
 doc <- read_docx() %>% body_add_flextable(value = ft)
+docx_summary(doc) %>% head()
+
+print(doc, target = "regulartable_example.docx")
+
+
+##################
+
+
+# add flextable to word - note that r logo image does save to word doc (unlike ppt??)
+# note the table can be easily copied from word to excel
+doc <- read_docx() %>% body_add_flextable(value = myft)
 docx_summary(doc) %>% head()
 
 print(doc, target = "flextable_example.docx")
 
 
-##############
+###########################################################################################
+
+
+# save regular table to png requires using webshot (per author of officer package)
+# https://stackoverflow.com/questions/50225669/how-to-save-flextable-as-png-in-r
+# note i use slightly differnt code than the stackoverflow answer, 
+# knitting rmd direct from r script intead of creating rmd
+# trying pdf()...dev.off() gets error that table is not a vector graphic with x,y coordinates
+
+# save r script to tempfile for rendering as an rmarkdown doc
+r_script_name <- tempfile(fileext = ".R")
+cat("myft", file = r_script_name)
+
+# create temporary html file for output of rendering
+html_name <- tempfile(fileext = ".html")
+
+# render r script as if it were rmarkdown
+# http://brooksandrew.github.io/simpleblog/articles/render-reports-directly-from-R-scripts/
+render(input = r_script_name, output_format = "html_document", 
+       output_file = html_name)
+
+# get a png from the html file with webshot
+# note that png and pdf will have higher resolution the higher the zoom
+# 1 vs 5 is very noticeable; 10 vs 20 is less so until you enlarge pdf to see fine details
+webshot(html_name, zoom = 20, delay = .5, file = "regulartable_zoom.png", 
+        selector = "table")
+
+# read png into magick
+table_png_image <- image_read("regulartable_zoom.png")
+table_png_image
+
+# output png as pdf
+image_write(table_png_image, path = "regulartable_zoom.pdf", format = "pdf")
+
+
+###########################################################################################
+
+
+# add ggplot to excel
+gg <- ggplot(mtcars, aes(x = mpg , y = wt, colour = qsec)) + geom_point() + theme_minimal()
+gg
+
+doc <- read_xlsx()
+doc <- xl_add_vg(doc, sheet = "Feuil1", code = print(gg), 
+                 width = 6, height = 6, left = 1, top = 2 )
+print(doc, target = "gg_example.xlsx")
+
+
+###########################################################################################
 
 
 # rvg package allows you put editable ggplots into powerpoint (not word)
