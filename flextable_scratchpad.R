@@ -74,7 +74,7 @@ myft <- theme_vanilla(myft)
 myft
 
 # autofit column width and row height
-myft <- autofit(myft)
+# myft <- autofit(myft)
 myft
 
 # show gap in table gridlines to reflect the empty column "col_1"
@@ -127,7 +127,7 @@ ft_base
 dim(ft_base)
 
 # use dim_pretty for optimized height/width
-dim_pretty(ft_base)
+# dim_pretty(ft_base)
 
 # autofit changes height/width, but not exactly to dim_pretty
 ft_base_pretty <- ft_base %>% autofit()
@@ -310,6 +310,26 @@ ft <- style( ft, pr_t = def_text_header, part = "header")
 ft
 
 
+##########
+
+
+# note that fp_cell, fp_border, and fp_par create flextable properties (fp) for cells, borders, and paragraphs 
+# then you can apply these properties using style() by passing to pr_c (cell), pr_p (paragraph), and pr_t (text)
+# note fp_border seems to be applied using pr_c, since it applies at cell-level
+
+def_cell <- fp_cell(border = fp_border(color="#00FFFF"))
+
+def_par <- fp_par(text.align = "center")
+
+ft <- flextable(mtcars)
+
+ft <- style( ft, pr_c = def_cell, pr_p = def_par, part = "all")
+ft <- style(ft, ~ drat > 3.5, ~ vs + am + gear + carb,
+            pr_t = fp_text(color="red", italic = TRUE) )
+
+ft
+
+
 ####################################################
 
 
@@ -355,7 +375,7 @@ myft <- display( myft, i = ~ drat > 3.6,
                                    carb ~ sprintf("# %.0f carb.", carb) ), 
                  fprops = list(mpg = fp_text(color = "#CC55CC", bold = TRUE) )
 )
-myft <- autofit(myft)
+# myft <- autofit(myft)
 myft
 
 # more complex example
@@ -369,9 +389,10 @@ myft <- display( myft, col_key = "mpg",
                          my_message = fp_text(color = "gray", vertical.align = "superscript")
                  ) 
 )
-myft <- autofit(myft)
+# myft <- autofit(myft)
 myft
-
+myft %>% width(j = 4, width = 3) %>% align(j = 4, align = "center")
+        
 
 #############################################################
 
