@@ -7,9 +7,58 @@ library(webshot)
 library(magick)
 
 # https://davidgohel.github.io/flextable/articles/overview.html
+# https://davidgohel.github.io/flextable/reference/index.html
 
 # setwd
 setwd("C:/Users/Stephen/Desktop/R/flextable")
+
+# flextable has lots of customization options, here is an example
+data <- starwars %>% select(name, species, homeworld, height, mass) %>% slice(1:5)
+data %>% regulartable() %>% 
+        add_header_row(values = "This is the title", colwidths = data %>% ncol()) %>%
+        align(i = 1, j = "name", align = "center", part = "header") %>%
+        style(i = 1, j = c("name", "species", "homeworld", "height", "mass"),
+              part = "header", pr_t = fp_text(font.size = 15, font.family = "Century")) %>%
+        style(i = 2, j = c("name", "species", "homeworld", "height", "mass"),
+              part = "header", pr_c = fp_cell(background.color = "#0066ff"),
+              pr_t = fp_text(color = "#ffffff", bold = TRUE, font.family = "Century")) %>%
+        style(i = seq(from = 1, to = nrow(data), by = 2), 
+              part = "body", pr_c = fp_cell(background.color = "#f2f2f2")) %>%
+        style(i = 1:nrow(data), j = c("name", "species", "homeworld", "height", "mass"),
+              part = "body", 
+              fp_text(font.family = "Century")) %>% 
+        add_footer_row(values = "this is footnote 1", colwidths = ncol(data)) %>%
+        add_footer_row(values = "this is footnote 2", colwidths = ncol(data)) %>%
+        compose(i = 1, part = "footer", 
+                value = as_paragraph(as_chunk("a ", props = fp_text(font.size = 7, 
+                                                                    vertical.align = "superscript")),
+                                     "this is footnote 1")) %>%
+        compose(i = 2, part = "footer", 
+                value = as_paragraph(as_chunk("b ", props = fp_text(font.size = 7, 
+                                                                    vertical.align = "superscript")),
+                                     "this is footnote 2")) %>%
+        style(part = "footer", pr_t = fp_text(font.family = "Century")) %>%
+        compose(j = "species", part = "header", 
+                value = as_paragraph("species", as_chunk("a", props = fp_text(color = "#ffffff", font.size = 7, 
+                                                                              vertical.align = "superscript")))) %>%
+        compose(i = ~ height > 160, j = "mass", part = "body", 
+                value = as_paragraph("new_value: ", 
+                                     as_chunk(mass), 
+                                     as_chunk("b", props = fp_text(color = "#ff3300", 
+                                                                   font.size = 7, vertical.align = "superscript")))) %>%
+        compose(i = ~ species == "Human", j = "species",
+                value = as_paragraph(as_image( src = file.path( R.home("doc"), "html", "logo.jpg" ), 
+                                               width = .20, height = .15))) %>%
+        compose(j = "height", part = "body",
+                value = as_paragraph(minibar(value = height, max = max(height)))) %>%
+        autofit() %>% width(j = "mass", width = 2)
+
+
+
+######################################################################
+######################################################################
+######################################################################
+
 
 # example
 mtcars_table <- mtcars %>% head() %>% regulartable(col_keys = c("am", "carb", "gear", "mpg", "drat")) 
@@ -28,6 +77,15 @@ mtcars_table %>% theme_box()
 
 
 # layout
+
+# merge
+# note that value of cell[min(i), min(j)] is used to populate the new merged cell
+ft <- flextable( head( iris ),
+                 col_keys = c("Species", "Sepal.Length", "Petal.Length", "Sepal.Width", "Petal.Width") )
+ft <- add_footer(ft, Species = "This is a footnote" )
+ft <- merge_at(ft, j = 1:5, part = "footer")
+ft <- merge_at(ft, i = 1:2, j = 1:2, part = "body")
+ft
 
 # merge_v will merge adjacent duplicated cells for each column of the selection
 select_columns <- c("Species", "Petal.Length", "Petal.Width")
@@ -348,72 +406,160 @@ ft
 ##########################################################
 
 
-# display function to format flextables
-# allows you to build customized formatting functions that can relay on other variables in row 
-myft <- flextable( head(mtcars), 
+# compose allows you to build customized formatting functions that can relay on other variables in row 
+# note display() seems to have been deprecated in docs (though still works) in favor of compose()
+# note that purrr compose() will mask flextable compose() if purrr/tidyverse is loaded after flextable
+# so you must load purr/tidyverse first, and then load flextable
+
+myft <- flextable( head(mtcars),
                    col_keys = c("am", "separator", "gear", "mpg", "drat", "qsec" ))
 myft <- bold(myft, part = "header")
-myft <- border(myft, border = fp_border( width = 0), 
-               border.top = fp_border(), border.bottom = fp_border(), 
+myft <- border(myft, border = fp_border(width = 0),
+               border.top = fp_border(), border.bottom = fp_border(),
                part = "all")
 myft <- align(myft, align = "right", part = "all" )
 myft <- border(myft, j = ~ separator, border = fp_border(width=0), part = "all")
 myft <- width(myft, j = ~ separator, width = .1)
 myft
 
-# simple example of using display
-myft <- display( myft, col_key = "mpg", pattern = "{{mpg}}", 
-                 formatters = list(mpg ~ sprintf("%.01f", mpg) ), 
-                 fprops = list(mpg = fp_text(color = "red", italic = TRUE) )
+myft <- compose(
+        myft, j = "mpg",
+        value = as_paragraph(
+                "mpg value is ",
+                as_chunk(sprintf("%.01f", mpg), props = fp_text(color = "red", bold = TRUE) ) )
 )
 myft
+myft %>% autofit()
 
-# complex example
-myft <- display( myft, i = ~ drat > 3.6, 
-                 col_key = "mpg", pattern = "{{mpg}} with {{carb}}", 
-                 formatters = list(mpg ~ sprintf("%.01f", mpg), 
-                                   carb ~ sprintf("# %.0f carb.", carb) ), 
-                 fprops = list(mpg = fp_text(color = "#CC55CC", bold = TRUE) )
+
+##########
+
+
+myft <- compose(
+        myft, j = "mpg",
+        value = as_paragraph(
+                "mpg value is ",
+                as_chunk(sprintf("%.01f", mpg), props = fp_text(color = "red", bold = TRUE) ),
+                " with ",
+                as_chunk(sprintf("# %.0f", carb), props = fp_text(color = "gray", italic = TRUE) )
+        )
 )
-# myft <- autofit(myft)
+
+myft <- autofit(myft)
 myft
 
-# more complex example
-myft <- display( myft, col_key = "mpg", 
-                 part = "header",
-                 pattern = "Miles/(US) gallon {{my_message}}", 
-                 formatters = list(
-                         my_message ~ sprintf("* with num of carb.") 
-                 ), 
-                 fprops = list(
-                         my_message = fp_text(color = "gray", vertical.align = "superscript")
-                 ) 
+
+########
+
+
+myft <- compose(
+        myft, j = "mpg", part = "header",
+        value = as_paragraph(
+                "Miles/(US) gallon ",
+                as_chunk("* with num of carb.", props = fp_text(color = "gray", vertical.align = "superscript") )
+        )
 )
-# myft <- autofit(myft)
+
+myft <- autofit(myft)
 myft
-myft %>% width(j = 4, width = 3) %>% align(j = 4, align = "center")
-        
-
-#############################################################
 
 
-# images
-# display can accept image insertion
+############
+
+
 img.file <- file.path( R.home("doc"), "html", "logo.jpg" )
 
-myft <- flextable( head(mtcars), 
-                   col_keys = c("am", "separator", "gear", "mpg", "drat", "qsec" ))
-myft
-
-myft <- display( myft, i = ~ qsec > 18, col_key = "qsec", 
-                 pattern = "blah blah {{r_logo}} {{qsec}}",
-                 formatters = list(
-                         r_logo ~ as_image(qsec, src = img.file, width = .20, height = .15), 
-                         qsec ~ sprintf("qsec: %.1f", qsec) ), 
-                 fprops = list(qsec = fp_text(color = "orange", vertical.align = "superscript"))
+myft <- compose( myft, i = ~ qsec > 18, j = "qsec",
+                 value = as_paragraph(as_image( src = img.file, width = .20, height = .15))
 )
 myft <- autofit(myft)
 myft
+
+
+############
+
+
+# can also add a minbar
+myft <- flextable( head(iris, n = 10 ))
+
+myft <- compose( myft, j = 1,
+                 value = as_paragraph(
+                         minibar(value = Sepal.Length, max = max(Sepal.Length))
+                 ),
+                 part = "body")
+
+autofit(myft)
+
+
+######################################################3
+
+
+# # display function to format flextables
+# # allows you to build customized formatting functions that can relay on other variables in row
+# myft <- flextable( head(mtcars),
+#                    col_keys = c("am", "separator", "gear", "mpg", "drat", "qsec" ))
+# myft <- bold(myft, part = "header")
+# myft <- border(myft, border = fp_border( width = 0),
+#                border.top = fp_border(), border.bottom = fp_border(),
+#                part = "all")
+# myft <- align(myft, align = "right", part = "all" )
+# myft <- border(myft, j = ~ separator, border = fp_border(width=0), part = "all")
+# myft <- width(myft, j = ~ separator, width = .1)
+# myft
+# 
+# # simple example of using display
+# myft <- display( myft, col_key = "mpg", pattern = "{{mpg}}",
+#                  formatters = list(mpg ~ sprintf("%.01f", mpg) ),
+#                  fprops = list(mpg = fp_text(color = "red", italic = TRUE) )
+# )
+# myft
+# 
+# # complex example
+# myft <- display( myft, i = ~ drat > 3.6,
+#                  col_key = "mpg", pattern = "{{mpg}} with {{carb}}",
+#                  formatters = list(mpg ~ sprintf("%.01f", mpg),
+#                                    carb ~ sprintf("# %.0f carb.", carb) ),
+#                  fprops = list(mpg = fp_text(color = "#CC55CC", bold = TRUE) )
+# )
+# # myft <- autofit(myft)
+# myft
+# 
+# # more complex example
+# myft <- display( myft, col_key = "mpg",
+#                  part = "header",
+#                  pattern = "Miles/(US) gallon {{my_message}}",
+#                  formatters = list(
+#                          my_message ~ sprintf("* with num of carb.")
+#                  ),
+#                  fprops = list(
+#                          my_message = fp_text(color = "gray", vertical.align = "superscript")
+#                  )
+# )
+# # myft <- autofit(myft)
+# myft
+# myft %>% width(j = 4, width = 3) %>% align(j = 4, align = "center")
+# 
+# 
+# #############################################################
+# 
+# 
+# # images
+# # display can accept image insertion
+# img.file <- file.path( R.home("doc"), "html", "logo.jpg" )
+# 
+# myft <- flextable( head(mtcars),
+#                    col_keys = c("am", "separator", "gear", "mpg", "drat", "qsec" ))
+# myft
+# 
+# myft <- display( myft, i = ~ qsec > 18, col_key = "qsec",
+#                  pattern = "blah blah {{r_logo}} {{qsec}}",
+#                  formatters = list(
+#                          r_logo ~ as_image(qsec, src = img.file, width = .20, height = .15),
+#                          qsec ~ sprintf("qsec: %.1f", qsec) ),
+#                  fprops = list(qsec = fp_text(color = "orange", vertical.align = "superscript"))
+# )
+# myft <- autofit(myft)
+# myft
 
 
 
