@@ -12,9 +12,22 @@ library(magick)
 # setwd
 setwd("C:/Users/Stephen/Desktop/R/flextable")
 
-# flextable has lots of customization options, here is an example
+# quick example - note saving with save_as_docx is best option
+# saving as pdf or image etc results in data quality issues when copied to word and attempt pdf conversion
+# quality can look good in Word, but when attempt to convert to pdf it gets grainy
+# also go in Word to File -> Options -> Advanced -> 
+# scroll down to Image Size/Quality, check don't compress, select highest quality dpi
+# then hit File -> Print -> Adobe PDF (don't use Save As PDF option)
+# in Print dialog window, hit Printer Properties and select highest quality
 data <- starwars %>% select(name, species, homeworld, height, mass) %>% slice(1:5)
-data %>% regulartable() %>% 
+ft <- data %>% flextable()
+ft
+ft %>% save_as_docx(path = "test_starwars_ft.docx")
+
+
+# flextable has lots of customization options, here is an example
+# note that as the pacakge updated, some of this original code broke, but just visit the site docs, it's great
+data %>% flextable() %>% 
         add_header_row(values = "This is the title", colwidths = data %>% ncol()) %>%
         align(i = 1, j = "name", align = "center", part = "header") %>%
         style(i = 1, j = c("name", "species", "homeworld", "height", "mass"),
